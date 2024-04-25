@@ -4,10 +4,7 @@ from Crypto.Random import get_random_bytes
 
 class BlockCipherEncryption:
     def __init__(self, cipher, key):
-        if cipher == 'AES':
-            self.cipher = AES.new(key, AES.MODE_EAX)
-        elif cipher == 'DES':
-            self.cipher = DES.new(key, DES.MODE_EAX)
+        self.cipher = cipher.new(key, cipher.MODE_EAX)
 
     def get_nonce(self):
         return self.cipher.nonce
@@ -19,10 +16,7 @@ class BlockCipherEncryption:
 
 class BlockCipherDecyption:
     def __init__(self, cipher, key, nonce):
-        if cipher == 'AES':
-            self.cipher = AES.new(key, AES.MODE_EAX, nonce)
-        elif cipher == 'DES':
-            self.cipher = DES.new(key, DES.MODE_EAX, nonce)
+        self.cipher = cipher.new(key, cipher.MODE_EAX, nonce)
 
     def decrypt(self, ciphertext):
         plaintext = self.cipher.decrypt(ciphertext)
@@ -30,7 +24,7 @@ class BlockCipherDecyption:
 
 
 if __name__ == '__main__':
-    CIPHER = 'DES'
+    CIPHER = DES
     KEY_SIZE = 8
 
     key = get_random_bytes(KEY_SIZE)
