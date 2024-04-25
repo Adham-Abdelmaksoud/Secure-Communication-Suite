@@ -1,20 +1,21 @@
-from Crypto.Hash import SHA256
-from Crypto.Hash import MD5
+from Crypto.Hash import SHA256, MD5
+from enum import Enum
+
+
+class HashingType(Enum):
+    SHA256 = SHA256
+    MD5 = MD5
+
 
 class Hashing:
     @staticmethod
-    def hash(message: bytes, algorithm: str):
-        if algorithm == "SHA-256":
-            return SHA256.new(message)
-        if algorithm == "MD5":
-            h = MD5.new()
-            h.update(message)
-            return h
-        raise ValueError("Algorithm should be either SHA-256 or MD5")
+    def hash(message: bytes, algorithm: HashingType):
+        return algorithm.value.new(message)
 
 
 if __name__ == '__main__':
+    HASH = HashingType.SHA256
     hashing = Hashing()
     msg = b"Some message"
-    message_hash = hashing.hash(msg, "SHA-256")
+    message_hash = hashing.hash(msg, HASH)
     print(message_hash.hexdigest())
