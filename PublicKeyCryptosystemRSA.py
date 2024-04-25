@@ -40,7 +40,8 @@ class PublicKeyCryptosystemVerification:
 
 
 if __name__ == '__main__':
-    from Hashing import Hashing
+    from Hashing import Hashing, HashingType
+
     private_key = RSA.generate(1024)
     public_key = private_key.public_key()
 
@@ -53,7 +54,7 @@ if __name__ == '__main__':
     TAMPERED_MESSAGE = b"This is a tampered message"
     tampered_cipher_text = encryption.encrypt(TAMPERED_MESSAGE)
 
-    hash_sender = Hashing.hash(ORIGINAL_MESSAGE,"SHA-256")
+    hash_sender = Hashing.hash(ORIGINAL_MESSAGE, HashingType.SHA256)
     signing = PublicKeyCryptosystemSigning(private_key)
     signed_message = signing.sign(hash_sender)
 
@@ -61,7 +62,7 @@ if __name__ == '__main__':
     decryption = PublicKeyCryptosystemDecryption(private_key)
     plain_text = decryption.decrypt(original_cipher_text)
     print(plain_text)
-    hash_receiver = Hashing.hash(plain_text,"SHA-256")
+    hash_receiver = Hashing.hash(plain_text, HashingType.SHA256)
     verifying = PublicKeyCryptosystemVerification(public_key)
     if verifying.verify(hash_receiver,signed_message):
         print("The message is original")
@@ -72,7 +73,7 @@ if __name__ == '__main__':
     decryption = PublicKeyCryptosystemDecryption(private_key)
     plain_text = decryption.decrypt(tampered_cipher_text)
     print(plain_text)
-    hash_receiver = Hashing.hash(plain_text,"SHA-256")
+    hash_receiver = Hashing.hash(plain_text, HashingType.SHA256)
     verifying = PublicKeyCryptosystemVerification(public_key)
     if verifying.verify(hash_receiver,signed_message):
         print("The message is original")

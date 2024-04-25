@@ -1,5 +1,6 @@
 from Crypto.Hash import SHA256, MD5
 from enum import Enum
+from typing import Union
 
 
 class HashingType(Enum):
@@ -9,7 +10,7 @@ class HashingType(Enum):
 
 class Hashing:
     @staticmethod
-    def hash(message: bytes, algorithm: HashingType):
+    def hash(message: bytes, algorithm: HashingType) -> Union[SHA256.SHA256Hash, MD5.MD5Hash]:
         return algorithm.value.new(message)
 
 
