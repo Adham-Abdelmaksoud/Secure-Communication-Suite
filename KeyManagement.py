@@ -27,6 +27,22 @@ class KeyManager:
         private_key = secrets.randbelow(curve.field.n)
         public_key = private_key * curve.g
         return private_key, public_key
+    
+
+    def RSAKey_2_bytes(self, key):
+        return key.export_key()
+    
+    def cert_2_bytes(self, cert):
+        return crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
+    
+    def certKey_2_bytes(self, pub_key):
+        return crypto.dump_publickey(crypto.FILETYPE_PEM, pub_key)
+    
+    def bytes_2_RSAKey(self, key_bytes):
+        return RSA.import_key(key_bytes)
+    
+    def bytes_2_cert(self, cert_bytes):
+        return crypto.load_certificate(crypto.FILETYPE_PEM, cert_bytes)
 
 
     def store_DES_AES_key(self, key, key_name):
@@ -35,7 +51,7 @@ class KeyManager:
     
     def store_RSA_key(self, key, key_name):
         with open(os.path.join(self.key_store_dir, key_name), 'wb') as f:
-            f.write(key.export_key())
+            f.write(self.RSAKey_2_bytes(key))
 
     def store_ECC_priv_key(self, priv_key, key_name):
         with open(os.path.join(self.key_store_dir, key_name), 'wb') as f:
@@ -43,7 +59,7 @@ class KeyManager:
 
     def store_certificate(self, cert, cert_name):
         with open(os.path.join(self.cert_store_dir, cert_name), 'wt') as f:
-            f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode())
+            f.write(self.cert_2_bytes(cert).decode())
 
 
     def read_DES_AES_key(self, key_name):
@@ -52,7 +68,7 @@ class KeyManager:
     
     def read_RSA_key(self, key_name):
         with open(os.path.join(self.key_store_dir, key_name), 'rb') as f:
-            return RSA.import_key(f.read())
+            return self.bytes_2_RSAKey(f.read())
 
     def read_ECC_priv_key(self, key_name):
         with open(os.path.join(self.key_store_dir, key_name), 'rb') as f:
@@ -60,10 +76,11 @@ class KeyManager:
         
     def read_certificate(self, cert_name):
         with open(os.path.join(self.cert_store_dir, cert_name), 'r') as f:
-            return crypto.load_certificate(crypto.FILETYPE_PEM, f.read())
+            return self.bytes_2_cert(f.read())
 
 
 
 if __name__ == '__main__':
-    manager = KeyManager('./keys')
+    manager = KeyManager(None, None)
     priv_key, pub_key = manager.generate_ECC_keys()
+    print(pub_key)
