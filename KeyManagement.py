@@ -4,6 +4,8 @@ import secrets
 from tinyec import registry
 import os
 from OpenSSL import crypto
+from cryptography.hazmat.primitives.asymmetric import dh
+from cryptography.hazmat.primitives.serialization import Encoding, ParameterFormat, PublicFormat, load_pem_public_key, load_pem_parameters
 
 
 class KeyManager:
@@ -28,6 +30,15 @@ class KeyManager:
         public_key = private_key * curve.g
         return private_key, public_key
     
+    def generate_DH_keys(self, dh_params):
+        dh_server_priv_key = dh_params.generate_private_key()
+        dh_server_pub_key = dh_server_priv_key.public_key()
+        return dh_server_priv_key, dh_server_pub_key
+    
+    def generate_DH_params(self, generator=2, key_size=512):
+        return dh.generate_parameters(generator=generator, key_size=key_size)
+    
+
 
     def RSAKey_2_bytes(self, key):
         return key.export_key()
@@ -43,6 +54,19 @@ class KeyManager:
     
     def bytes_2_cert(self, cert_bytes):
         return crypto.load_certificate(crypto.FILETYPE_PEM, cert_bytes)
+    
+    def dhPubKey_2_bytes(self, dh_pub_key):
+        return dh_pub_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
+    
+    def dhParams_2_bytes(self, dh_params):
+        return dh_params.parameter_bytes(Encoding.PEM, ParameterFormat.PKCS3)
+    
+    def bytes_2_dhPubKey(self, dh_pub_key_bytes):
+        return load_pem_public_key(dh_pub_key_bytes)
+    
+    def bytes_2_dhParams(self, dh_params_bytes):
+        return load_pem_parameters(dh_params_bytes)
+
 
 
     def store_DES_AES_key(self, key, key_name):

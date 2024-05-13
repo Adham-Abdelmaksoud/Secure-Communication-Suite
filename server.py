@@ -6,11 +6,7 @@ from KeyManagement import KeyManager
 from PublicKeyCryptosystemRSA import PublicKeyCryptosystemSigning
 from Hashing import Hashing, HashingType
 from BlockCipher import BlockCipherType
-
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import dh
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, ParameterFormat, load_pem_public_key, load_pem_parameters
+from DiffieHelman import DiffieHelman
 
 SERVER_IP = ''
 SERVER_PORT = 10000
@@ -49,11 +45,11 @@ def send_cert_dhKey_sign(client_sock, blockcipher_t, hashing_t):
     signer = PublicKeyCryptosystemSigning(my_priv_key)
     cert_sign = signer.sign(Hashing.hash(cert_bytes, hashing_t))
 
-    dh_params = dh.generate_parameters(generator=2, key_size=512)
-    dh_server_priv_key = dh_params.generate_private_key()
-    dh_server_pub_key = dh_server_priv_key.public_key()
-    dh_params_bytes = dh_params.parameter_bytes(Encoding.PEM,ParameterFormat.PKCS3)
-    dh_server_pub_key_bytes = dh_server_pub_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
+    manager = KeyManager(None, None)
+    dh_params = manager.generate_DH_params()
+    dh_server_priv_key, dh_server_pub_key = manager.generate_DH_keys(dh_params)
+    dh_params_bytes = manager.dhParams_2_bytes(dh_params)
+    dh_server_pub_key_bytes = manager.dhPubKey_2_bytes(dh_server_pub_key)
 
     client_sock.send(pickle.dumps([cert_bytes, cert_sign, dh_params_bytes, dh_server_pub_key_bytes]))
 
@@ -63,14 +59,11 @@ def send_cert_dhKey_sign(client_sock, blockcipher_t, hashing_t):
 def recv_dh_client_pub_key(client_sock, dh_server_priv_key):
     dh_client_pub_key_bytes = client_sock.recv(4096)
 
-    dh_client_pub_key = load_pem_public_key(dh_client_pub_key_bytes)
-    shared_key = dh_server_priv_key.exchange(dh_client_pub_key)
-    derived_key = HKDF(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=None,
-        info=b'handshake data',
-    ).derive(shared_key)
+    manager = KeyManager(None, None)
+    dh_client_pub_key = manager.bytes_2_dhPubKey(dh_client_pub_key_bytes)
+
+    dh = DiffieHelman(dh_server_priv_key, dh_client_pub_key)
+    derived_key = dh.calculate_shared_key()
     print(derived_key)
 
 

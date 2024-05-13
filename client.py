@@ -6,10 +6,7 @@ from BlockCipher import BlockCipherType
 from PublicKeyCryptosystemRSA import PublicKeyCryptosystemVerification
 from Hashing import Hashing, HashingType
 from KeyManagement import KeyManager
-
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, ParameterFormat, load_pem_public_key, load_pem_parameters
+from DiffieHelman import DiffieHelman
 
 
 SERVER_IP = '127.0.0.1'
@@ -32,17 +29,13 @@ def recv_cert_ecdhKey_sign(client_sock):
     cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_bytes)
     cert_server_pub_key = cert.get_pubkey()
 
-    dh_params = load_pem_parameters(dh_params_bytes)
-    dh_server_pub_key = load_pem_public_key(dh_server_pub_key_bytes)
-    dh_client_priv_key = dh_params.generate_private_key()
-    dh_client_pub_key = dh_client_priv_key.public_key()
-    shared_key = dh_client_priv_key.exchange(dh_server_pub_key)
-    derived_key = HKDF(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=None,
-        info=b'handshake data',
-    ).derive(shared_key)
+    manager = KeyManager(None, None)
+    dh_params = manager.bytes_2_dhParams(dh_params_bytes)
+    dh_server_pub_key = manager.bytes_2_dhPubKey(dh_server_pub_key_bytes)
+    dh_client_priv_key, dh_client_pub_key = manager.generate_DH_keys(dh_params)
+
+    dh = DiffieHelman(dh_client_priv_key, dh_server_pub_key)
+    derived_key = dh.calculate_shared_key()
     print(derived_key)
         
     manager = KeyManager(None, None)
@@ -54,7 +47,8 @@ def recv_cert_ecdhKey_sign(client_sock):
 
 
 def send_dh_client_pub_key(client_sock, dh_client_pub_key):
-    dh_client_pub_key_bytes = dh_client_pub_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
+    manager = KeyManager(None, None)
+    dh_client_pub_key_bytes = manager.dhPubKey_2_bytes(dh_client_pub_key)
     client_sock.send(pickle.dumps(dh_client_pub_key_bytes))
 
 
