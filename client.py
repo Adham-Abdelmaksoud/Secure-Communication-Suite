@@ -1,6 +1,7 @@
 from socket import *
 import pickle
 import threading
+import sys
 
 from BlockCipher import BlockCipherType
 from PublicKeyCryptosystemRSA import PublicKeyCryptosystemVerification
@@ -56,6 +57,19 @@ def recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t):
     return dh_client_pub_key, derived_key
 
 
+def send_username_password(client_sock, blockcipher_t, hashing_t):
+    print('(1) Login')
+    print('(2) Signup')
+    login_signup = int(input('Enter the number corresponding to the desired action: '))
+    username = input('Enter your username: ')
+    password = input('Enter your password: ')
+
+    all_data = pickle.dumps([username, password, login_signup])
+    cipher_msg, msg_signature, nonce = encrypt_message(all_data, derived_key, blockcipher_t, hashing_t)
+
+    client_sock.send(pickle.dumps([cipher_msg, msg_signature, nonce]))
+
+
 def send_dhPubKey(client_sock, dh_client_pub_key):
     # convert objects to bytes
     manager = KeyManager()
@@ -76,9 +90,19 @@ if __name__ == '__main__':
     send_security_params(client_sock, blockcipher_t, hashing_t)
     dh_client_pub_key, derived_key = recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t)
     send_dhPubKey(client_sock, dh_client_pub_key)
+    send_username_password(client_sock, blockcipher_t, hashing_t)
+
+    status = client_sock.recv(4096)
+    status = eval(status.decode())
+    if status:
+        print('Successful Operation')
+    else:
+        print('Unsuccessful Operation')
+        close_connection(client_sock)
+        sys.exit(0)
     
-    send_thread = threading.Thread(target=send_message, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
-    recv_thread = threading.Thread(target=recv_message, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
+    send_thread = threading.Thread(target=send_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
+    recv_thread = threading.Thread(target=recv_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
     send_thread.start()
     recv_thread.start()
 

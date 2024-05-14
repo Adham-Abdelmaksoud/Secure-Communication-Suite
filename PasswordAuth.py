@@ -27,6 +27,7 @@ class PasswordAuth:
         self.conn.commit()
         return True
 
+
     def authenticate(self, username: str, password: str) -> bool:
         cur = self.conn.cursor()
         query = """
@@ -34,9 +35,9 @@ class PasswordAuth:
                 """
         cur.execute(query,(username,))
         retrieved_pass = cur.fetchone()
-        if cur.rowcount == 0:
+        if not retrieved_pass:
             return False
-        return check_password_hash(retrieved_pass[0],password)
+        return check_password_hash(retrieved_pass[0], password)
         # return check_password_hash(password_dict[username], password)
 
 

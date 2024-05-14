@@ -7,6 +7,7 @@ from KeyManagement import KeyManager
 from PublicKeyCryptosystemRSA import PublicKeyCryptosystemSigning
 from Hashing import Hashing
 from DiffieHelman import DiffieHelman
+from PasswordAuth import PasswordAuth
 from MessageThreads import *
 
 
@@ -78,6 +79,29 @@ def recv_dhPubKey(client_sock, dh_server_priv_key, blockcipher_t):
     derived_key = dh.calculate_shared_key(blockcipher_t)
 
     return derived_key
+
+
+def recv_username_password(client_sock, blockcipher_t, hashing_t):
+    pickle_obj = client_sock.recv(4096)
+    cipher_msg, msg_signature, nonce = pickle.loads(pickle_obj)
+
+    all_data, my_hashed_msg, hashed_msg = decrypt_message(cipher_msg, msg_signature, nonce, derived_key, blockcipher_t, hashing_t)
+
+    if(my_hashed_msg == hashed_msg):
+        print('VALID MESSAGE!')
+    else:
+        print('TAMPERED MESSAGE!!!')
+
+    username, password, login_signup = pickle.loads(all_data)
+
+    auth = PasswordAuth()
+    if login_signup == 1:
+        status = auth.authenticate(username, password)
+    elif login_signup == 2:
+        status = auth.register(username, password)
+    return status
+    
+    
         
 
 
@@ -91,9 +115,15 @@ if __name__ == '__main__':
         blockcipher_t, hashing_t = recv_security_params(client_sock)
         dh_server_priv_key = send_cert_dhPubKey_sign(client_sock, hashing_t)
         derived_key = recv_dhPubKey(client_sock, dh_server_priv_key, blockcipher_t)
+        status = recv_username_password(client_sock, blockcipher_t, hashing_t)
+        
+        client_sock.send(f'{status}'.encode())
+        if not status:
+            close_connection(client_sock)
+            continue
 
-        send_thread = threading.Thread(target=send_message, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
-        recv_thread = threading.Thread(target=recv_message, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
+        send_thread = threading.Thread(target=send_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
+        recv_thread = threading.Thread(target=recv_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
         
         send_thread.start()
         recv_thread.start()
