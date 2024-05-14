@@ -4,13 +4,13 @@ from enum import Enum
 
 
 class BlockCipherType(Enum):
-    AES = AES
-    DES = DES
+    AES = 'AES'
+    DES = 'DES'
 
 
 class BlockCipherEncryption:
     def __init__(self, cipher: BlockCipherType, key: bytes) -> None:
-        self.cipher = cipher.value.new(key, cipher.value.MODE_EAX)
+        self.cipher = eval(cipher.value).new(key, eval(cipher.value).MODE_EAX)
 
     def get_nonce(self) -> bytes:
         return self.cipher.nonce
@@ -22,7 +22,7 @@ class BlockCipherEncryption:
 
 class BlockCipherDecyption:
     def __init__(self, cipher: BlockCipherType, key: bytes, nonce: bytes) -> None:
-        self.cipher = cipher.value.new(key, cipher.value.MODE_EAX, nonce)
+        self.cipher = eval(cipher.value).new(key, eval(cipher.value).MODE_EAX, nonce)
 
     def decrypt(self, ciphertext: bytes) -> bytes:
         plaintext = self.cipher.decrypt(ciphertext)
@@ -35,7 +35,7 @@ if __name__ == '__main__':
 
     key = get_random_bytes(KEY_SIZE)
     encryption = BlockCipherEncryption(CIPHER, key)
-    with open('inputs/Skeleton.py', 'rb') as f:
+    with open('db.py', 'rb') as f:
         plaintext = f.read()
     
     ciphertext = encryption.encrypt(plaintext)

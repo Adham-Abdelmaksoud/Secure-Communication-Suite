@@ -9,10 +9,6 @@ from cryptography.hazmat.primitives.serialization import Encoding, ParameterForm
 
 
 class KeyManager:
-    def __init__(self, key_store_dir, cert_store_dir):
-        self.key_store_dir = key_store_dir
-        self.cert_store_dir = cert_store_dir
-
     def generate_DES_session_key(self, key_size=8):
         return get_random_bytes(key_size)
     
@@ -69,42 +65,42 @@ class KeyManager:
 
 
 
-    def store_DES_AES_key(self, key, key_name):
-        with open(os.path.join(self.key_store_dir, key_name), 'wb') as f:
+    def store_DES_AES_key(self, key, key_name, key_dir):
+        with open(os.path.join(key_dir, key_name), 'wb') as f:
             f.write(key)
     
-    def store_RSA_key(self, key, key_name):
-        with open(os.path.join(self.key_store_dir, key_name), 'wb') as f:
+    def store_RSA_key(self, key, key_name, key_dir):
+        with open(os.path.join(key_dir, key_name), 'wb') as f:
             f.write(self.RSAKey_2_bytes(key))
 
-    def store_ECC_priv_key(self, priv_key, key_name):
-        with open(os.path.join(self.key_store_dir, key_name), 'wb') as f:
+    def store_ECC_priv_key(self, priv_key, key_name, key_dir):
+        with open(os.path.join(key_dir, key_name), 'wb') as f:
             f.write(priv_key.to_bytes(32, 'big'))
 
-    def store_certificate(self, cert, cert_name):
-        with open(os.path.join(self.cert_store_dir, cert_name), 'wt') as f:
+    def store_certificate(self, cert, cert_name, cert_dir):
+        with open(os.path.join(cert_dir, cert_name), 'wt') as f:
             f.write(self.cert_2_bytes(cert).decode())
 
 
-    def read_DES_AES_key(self, key_name):
-        with open(os.path.join(self.key_store_dir, key_name), 'rb') as f:
+    def read_DES_AES_key(self, key_name, key_dir):
+        with open(os.path.join(key_dir, key_name), 'rb') as f:
             return f.read()
     
-    def read_RSA_key(self, key_name):
-        with open(os.path.join(self.key_store_dir, key_name), 'rb') as f:
+    def read_RSA_key(self, key_name, key_dir):
+        with open(os.path.join(key_dir, key_name), 'rb') as f:
             return self.bytes_2_RSAKey(f.read())
 
-    def read_ECC_priv_key(self, key_name):
-        with open(os.path.join(self.key_store_dir, key_name), 'rb') as f:
+    def read_ECC_priv_key(self, key_name, key_dir):
+        with open(os.path.join(key_dir, key_name), 'rb') as f:
             return int.from_bytes(f.read(), 'big')
         
-    def read_certificate(self, cert_name):
-        with open(os.path.join(self.cert_store_dir, cert_name), 'r') as f:
+    def read_certificate(self, cert_name, cert_dir):
+        with open(os.path.join(cert_dir, cert_name), 'r') as f:
             return self.bytes_2_cert(f.read())
 
 
 
 if __name__ == '__main__':
-    manager = KeyManager(None, None)
+    manager = KeyManager()
     priv_key, pub_key = manager.generate_ECC_keys()
     print(pub_key)

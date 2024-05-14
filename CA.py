@@ -1,11 +1,10 @@
 import random
 import os
-from datetime import datetime
 from OpenSSL import crypto
-# from cryptography import crypto
+from CertificateVerifier import CA_verification
+
 
 def create_CA(root_ca_path, public_key_path, private_key_path):
-
     with open(private_key_path, 'rb') as f:
         ca_private_key = crypto.load_privatekey(crypto.FILETYPE_PEM,f.read())
     with open(public_key_path, 'rb') as f:
@@ -44,33 +43,19 @@ def create_CA(root_ca_path, public_key_path, private_key_path):
 
     ca_cert.sign(ca_private_key, 'sha256')
 
-    # Save certificate
     with open(root_ca_path, "wt") as f:
         f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, ca_cert).decode("utf-8"))
         
         
 def load_CA(root_ca_path, private_key_path):
-    ''' Load CA and Key'''
-
     with open(root_ca_path, "r") as f:
         ca_cert = crypto.load_certificate(crypto.FILETYPE_PEM, f.read())
     with open(private_key_path, "r") as f:
         ca_key = crypto.load_privatekey(crypto.FILETYPE_PEM, f.read())
     return ca_cert, ca_key
-
-
-def CA_verification(ca_cert):  
-    ''' Varify the CA certificate '''
-
-    ca_expiry = datetime.strptime(str(ca_cert.get_notAfter(), 'utf-8'),"%Y%m%d%H%M%SZ")
-    now = datetime.now()
-    validity = (ca_expiry - now).days
-    print ("CA Certificate valid for {} days".format(validity))
     
             
 def create_cert(ca_cert, ca_subj, ca_key, client_cn, client_email, client_public_key):
-    ''' Create Client certificate '''
-
     client_cert = crypto.X509()
     client_cert.set_version(2)
     client_cert.set_serial_number(random.randint(50000000, 100000000))
@@ -101,10 +86,6 @@ def create_cert(ca_cert, ca_subj, ca_key, client_cn, client_email, client_public
     client_cert.sign(ca_key, 'sha256')
 
     return client_cert
-    
-
-def client_varification():
-    pass
     
 
         
