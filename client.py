@@ -2,6 +2,7 @@ from socket import *
 import pickle
 import threading
 import sys
+import os
 
 from BlockCipher import BlockCipherType
 from PublicKeyCryptosystemRSA import PublicKeyCryptosystemVerification
@@ -24,8 +25,25 @@ def close_connection(client_sock):
     client_sock.close()
 
 
-def send_security_params(client_sock, blockcipher_t=BlockCipherType.AES, hashing_t=HashingType.SHA256):
+def send_security_params(client_sock):    
+    print('(1) AES')
+    print('(2) DES')
+    blockcipher_t = int(input('Enter the number corresponding to the desired block cipher: '))
+    if blockcipher_t == 1:
+        blockcipher_t = BlockCipherType.AES
+    elif blockcipher_t == 2:
+        blockcipher_t = BlockCipherType.DES
+    print(type(blockcipher_t))
+    print('(1) SHA256')
+    print('(2) MD5')
+    hashing_t = int(input('Enter the number corresponding to the desired hash: '))
+    if hashing_t == 1:
+        hashing_t = HashingType.SHA256
+    elif hashing_t == 2:
+        hashing_t = HashingType.MD5
     client_sock.send(pickle.dumps([blockcipher_t, hashing_t]))
+
+    return blockcipher_t, hashing_t
 
 def recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t):
     # receive message
@@ -76,7 +94,29 @@ def send_dhPubKey(client_sock, dh_client_pub_key):
     dh_client_pub_key_bytes = manager.dhPubKey_2_bytes(dh_client_pub_key)
 
     # send message
-    client_sock.send(pickle.dumps(dh_client_pub_key_bytes))        
+    client_sock.send(pickle.dumps(dh_client_pub_key_bytes))
+
+
+def send_authentication_method(client_sock):
+    print('(1) Password-based Authentication')
+    print('(2) Certificate-based Authentication')
+    auth_method = int(input('Enter the number corresponding to the desired authentication: '))
+    client_sock.send(f'{auth_method}'.encode())
+    return auth_method
+
+def read_cert_bytes(cert_dir='./Client', cert_name = 'certificate.crt'):
+    with open(os.path.join(cert_dir, cert_name), 'rb') as f:
+        return f.read()
+
+def send_cert(client_sock, derived_key, blockcipher_t, hashing_t):
+    cert_bytes = read_cert_bytes()
+
+    hashed_cert = Hashing.hash(cert_bytes, hashing_t)
+    blockcipherEncrypt = BlockCipherEncryption(blockcipher_t, derived_key)
+    nonce = blockcipherEncrypt.get_nonce()
+    signed_cert = blockcipherEncrypt.encrypt(hashed_cert.digest())
+
+    client_sock.send(pickle.dumps([cert_bytes, signed_cert, nonce]))
 
 
 
@@ -84,23 +124,29 @@ def send_dhPubKey(client_sock, dh_client_pub_key):
 if __name__ == '__main__':
     client_sock = start_connection()
 
-    blockcipher_t = BlockCipherType.AES
-    hashing_t = HashingType.SHA256
-
-    send_security_params(client_sock, blockcipher_t, hashing_t)
+    # Key Exchange
+    blockcipher_t, hashing_t = send_security_params(client_sock)
     dh_client_pub_key, derived_key = recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t)
     send_dhPubKey(client_sock, dh_client_pub_key)
-    send_username_password(client_sock, blockcipher_t, hashing_t)
 
+    # Authentication
+    auth_method = send_authentication_method(client_sock)
+    if auth_method == 1:
+        send_username_password(client_sock, blockcipher_t, hashing_t)
+    elif auth_method == 2:
+        send_cert(client_sock, derived_key, blockcipher_t, hashing_t)
+
+    # Authentication Status
     status = client_sock.recv(4096)
     status = eval(status.decode())
     if status:
-        print('Successful Operation')
+        print('Successful Authentication')
     else:
-        print('Unsuccessful Operation')
+        print('Unsuccessful Authentication')
         close_connection(client_sock)
         sys.exit(0)
     
+    # Send & Receive Threads
     send_thread = threading.Thread(target=send_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
     recv_thread = threading.Thread(target=recv_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
     send_thread.start()

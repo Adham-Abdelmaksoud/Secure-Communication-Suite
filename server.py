@@ -8,6 +8,7 @@ from PublicKeyCryptosystemRSA import PublicKeyCryptosystemSigning
 from Hashing import Hashing
 from DiffieHelman import DiffieHelman
 from PasswordAuth import PasswordAuth
+from CertificateVerification import CertificateVerifier
 from MessageThreads import *
 
 
@@ -102,7 +103,31 @@ def recv_username_password(client_sock, blockcipher_t, hashing_t):
     return status
     
     
-        
+def recv_authentication_method(client_sock):
+    auth_method = client_sock.recv(4096)
+    auth_method = eval(auth_method.decode())
+    return auth_method
+
+
+def recv_cert(client_sock, derived_key, blockcipher_t, hashing_t):
+    pickle_obj = client_sock.recv(4096)
+    client_cert_bytes, signed_cert, nonce = pickle.loads(pickle_obj)
+
+    my_hashed_cert = Hashing.hash(client_cert_bytes, hashing_t).digest()
+
+    blockcipherDecrypt = BlockCipherDecyption(blockcipher_t, derived_key, nonce)
+    hashed_cert = blockcipherDecrypt.decrypt(signed_cert)
+
+    if(my_hashed_cert != hashed_cert):
+        return False
+
+    manager = KeyManager()
+    client_cert = manager.bytes_2_cert(client_cert_bytes)
+
+    cert_verifier = CertificateVerifier()
+    status = cert_verifier.verify_certificate(client_cert)
+
+    return status
 
 
 
@@ -112,16 +137,24 @@ if __name__ == '__main__':
     while True:
         client_sock = start_connection(server_sock)
 
+        # Key Exchange
         blockcipher_t, hashing_t = recv_security_params(client_sock)
         dh_server_priv_key = send_cert_dhPubKey_sign(client_sock, hashing_t)
         derived_key = recv_dhPubKey(client_sock, dh_server_priv_key, blockcipher_t)
-        status = recv_username_password(client_sock, blockcipher_t, hashing_t)
+
+        # Authentication
+        auth_method = recv_authentication_method(client_sock)
+        if auth_method == 1:
+            status = recv_username_password(client_sock, blockcipher_t, hashing_t)
+        elif auth_method == 2:
+            status = recv_cert(client_sock, derived_key, blockcipher_t, hashing_t)
         
         client_sock.send(f'{status}'.encode())
         if not status:
             close_connection(client_sock)
             continue
 
+        # Send & Receive Threads
         send_thread = threading.Thread(target=send_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
         recv_thread = threading.Thread(target=recv_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
         
