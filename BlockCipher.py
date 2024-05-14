@@ -7,6 +7,11 @@ class BlockCipherType(Enum):
     AES = 'AES'
     DES = 'DES'
 
+BlockCipherKeySize = {
+    'AES': 32,
+    'DES': 8
+}
+
 
 class BlockCipherEncryption:
     def __init__(self, cipher: BlockCipherType, key: bytes) -> None:
