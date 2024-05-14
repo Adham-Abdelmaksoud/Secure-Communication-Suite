@@ -2,12 +2,13 @@ from socket import *
 import pickle
 import threading
 
-from BlockCipher import BlockCipherEncryption, BlockCipherDecyption, BlockCipherType
+from BlockCipher import BlockCipherType
 from PublicKeyCryptosystemRSA import PublicKeyCryptosystemVerification
 from Hashing import Hashing, HashingType
 from KeyManagement import KeyManager
 from DiffieHelman import DiffieHelman
 from CertificateVerification import CertificateVerifier
+from MessageThreads import *
 
 
 SERVER_IP = '127.0.0.1'
@@ -61,30 +62,7 @@ def send_dhPubKey(client_sock, dh_client_pub_key):
     dh_client_pub_key_bytes = manager.dhPubKey_2_bytes(dh_client_pub_key)
 
     # send message
-    client_sock.send(pickle.dumps(dh_client_pub_key_bytes))
-
-
-def send_message(client_sock, blockcipher_t, derived_key):    
-    while True:
-        message = input()
-        blockCipherEncrypt = BlockCipherEncryption(blockcipher_t, derived_key)
-        nonce = blockCipherEncrypt.get_nonce()
-        cipher_msg = blockCipherEncrypt.encrypt(message.encode())
-        client_sock.send(pickle.dumps([cipher_msg, nonce]))
-        if message == 'q':
-            break
-
-
-def recv_message(client_sock, blockcipher_t, derived_key):
-    while True:
-        pickle_obj = client_sock.recv(4096)
-        cipher_msg, nonce = pickle.loads(pickle_obj)
-        blockCipherDecrypt = BlockCipherDecyption(blockcipher_t, derived_key, nonce)
-        message = blockCipherDecrypt.decrypt(cipher_msg).decode()
-        print(message)
-        if message == 'q':
-            break
-        
+    client_sock.send(pickle.dumps(dh_client_pub_key_bytes))        
 
 
 
@@ -99,8 +77,8 @@ if __name__ == '__main__':
     dh_client_pub_key, derived_key = recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t)
     send_dhPubKey(client_sock, dh_client_pub_key)
     
-    send_thread = threading.Thread(target=send_message, args=(client_sock, blockcipher_t, derived_key,))
-    recv_thread = threading.Thread(target=recv_message, args=(client_sock, blockcipher_t, derived_key,))
+    send_thread = threading.Thread(target=send_message, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
+    recv_thread = threading.Thread(target=recv_message, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
     send_thread.start()
     recv_thread.start()
 
