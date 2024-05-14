@@ -1,11 +1,13 @@
 from socket import *
 import pickle
+import threading
 
-from BlockCipher import BlockCipherEncryption, BlockCipherType, BlockCipherKeySize
+from BlockCipher import BlockCipherEncryption, BlockCipherDecyption, BlockCipherType
 from PublicKeyCryptosystemRSA import PublicKeyCryptosystemVerification
 from Hashing import Hashing, HashingType
 from KeyManagement import KeyManager
 from DiffieHelman import DiffieHelman
+from CertificateVerification import CertificateVerifier
 
 
 SERVER_IP = '127.0.0.1'
@@ -30,8 +32,8 @@ def recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t):
 
     # convert message bytes to objects
     manager = KeyManager()
-    cert = manager.bytes_2_cert(cert_bytes)
-    cert_server_pub_key = cert.get_pubkey()
+    server_cert = manager.bytes_2_cert(cert_bytes)
+    cert_server_pub_key = server_cert.get_pubkey()
     RSA_server_pub_key = manager.bytes_2_RSAKey(manager.certKey_2_bytes(cert_server_pub_key))
     dh_params = manager.bytes_2_dhParams(dh_params_bytes)
     dh_server_pub_key = manager.bytes_2_dhPubKey(dh_server_pub_key_bytes)
@@ -40,12 +42,15 @@ def recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t):
     dh_client_priv_key, dh_client_pub_key = manager.generate_DH_keys(dh_params)
     dh = DiffieHelman(dh_client_priv_key, dh_server_pub_key)
     derived_key = dh.calculate_shared_key(blockcipher_t)
-    print(derived_key)
+
+    # verify server certificate
+    cert_verifier = CertificateVerifier()
+    print('Certificate Verified:', cert_verifier.verify_certificate(server_cert))
     
     # verify server signature
-    verifier = PublicKeyCryptosystemVerification(RSA_server_pub_key)
+    sign_verifier = PublicKeyCryptosystemVerification(RSA_server_pub_key)
     all_bytes = cert_bytes + dh_params_bytes + dh_server_pub_key_bytes
-    print(verifier.verify(Hashing.hash(all_bytes, hashing_t), msg_sign))
+    print('Signature Verified:', sign_verifier.verify(Hashing.hash(all_bytes, hashing_t), msg_sign))
 
     return dh_client_pub_key, derived_key
 
@@ -59,9 +64,26 @@ def send_dhPubKey(client_sock, dh_client_pub_key):
     client_sock.send(pickle.dumps(dh_client_pub_key_bytes))
 
 
+def send_message(client_sock, blockcipher_t, derived_key):    
+    while True:
+        message = input()
+        blockCipherEncrypt = BlockCipherEncryption(blockcipher_t, derived_key)
+        nonce = blockCipherEncrypt.get_nonce()
+        cipher_msg = blockCipherEncrypt.encrypt(message.encode())
+        client_sock.send(pickle.dumps([cipher_msg, nonce]))
+        if message == 'q':
+            break
 
 
-        
+def recv_message(client_sock, blockcipher_t, derived_key):
+    while True:
+        pickle_obj = client_sock.recv(4096)
+        cipher_msg, nonce = pickle.loads(pickle_obj)
+        blockCipherDecrypt = BlockCipherDecyption(blockcipher_t, derived_key, nonce)
+        message = blockCipherDecrypt.decrypt(cipher_msg).decode()
+        print(message)
+        if message == 'q':
+            break
         
 
 
@@ -76,5 +98,13 @@ if __name__ == '__main__':
     send_security_params(client_sock, blockcipher_t, hashing_t)
     dh_client_pub_key, derived_key = recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t)
     send_dhPubKey(client_sock, dh_client_pub_key)
+    
+    send_thread = threading.Thread(target=send_message, args=(client_sock, blockcipher_t, derived_key,))
+    recv_thread = threading.Thread(target=recv_message, args=(client_sock, blockcipher_t, derived_key,))
+    send_thread.start()
+    recv_thread.start()
+
+    send_thread.join()
+    recv_thread.join()
 
     close_connection(client_sock)

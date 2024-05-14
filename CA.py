@@ -1,7 +1,7 @@
 import random
 import os
 from OpenSSL import crypto
-from CertificateVerifier import CA_verification
+from CertificateVerification import CertificateVerifier
 
 
 def create_CA(root_ca_path, public_key_path, private_key_path):
@@ -89,55 +89,55 @@ def create_cert(ca_cert, ca_subj, ca_key, client_cn, client_email, client_public
     
 
         
-def main():
+# def main():
 
-    # with open('CA/ca_private.key', 'rb') as f:
-    #     private_key = crypto.load_privatekey(crypto.FILETYPE_PEM,f.read())
-    # with open('CA/ca_public.key', 'rb') as f:
-    #     public_key = crypto.load_publickey(crypto.FILETYPE_PEM,f.read())
+#     # with open('CA/ca_private.key', 'rb') as f:
+#     #     private_key = crypto.load_privatekey(crypto.FILETYPE_PEM,f.read())
+#     # with open('CA/ca_public.key', 'rb') as f:
+#     #     public_key = crypto.load_publickey(crypto.FILETYPE_PEM,f.read())
 
-    private_key_path = "CA/ca_private.key"
-    public_key_path = "CA/ca_public.key"
-    root_ca_path = "CA/ca_certificate.crt"
+#     private_key_path = "CA/ca_private.key"
+#     public_key_path = "CA/ca_public.key"
+#     root_ca_path = "CA/ca_certificate.crt"
     
-    if not os.path.exists('CA'):
-        print ("Creating CA driectory")
-        os.makedirs('CA')
+#     if not os.path.exists('CA'):
+#         print ("Creating CA driectory")
+#         os.makedirs('CA')
         
-    if not os.path.exists(root_ca_path):
-        print ("Creating CA Certificate, Please provide the values")
-        create_CA(root_ca_path, public_key_path, private_key_path)
-        print ("Created CA Certificate")
-        ca_cert, ca_key = load_CA(root_ca_path, private_key_path)
-        CA_verification(ca_cert)
-    else:
-        print ("CA certificate has been found as {}".format(root_ca_path))
-        ca_cert, ca_key = load_CA(root_ca_path, private_key_path)
-        CA_verification(ca_cert)
+#     if not os.path.exists(root_ca_path):
+#         print ("Creating CA Certificate, Please provide the values")
+#         create_CA(root_ca_path, public_key_path, private_key_path)
+#         print ("Created CA Certificate")
+#         ca_cert, ca_key = load_CA(root_ca_path, private_key_path)
+#         CA_verification(ca_cert)
+#     else:
+#         print ("CA certificate has been found as {}".format(root_ca_path))
+#         ca_cert, ca_key = load_CA(root_ca_path, private_key_path)
+#         CA_verification(ca_cert)
     
-    client_cn = "Mohamed Ayman"
-    client_email = "mohameddallash21@gmail.com"
+#     client_cn = "Mohamed Ayman"
+#     client_email = "mohameddallash21@gmail.com"
     
-    with open("public.txt",'rb') as f:
-        client_public_key = crypto.load_publickey(crypto.FILETYPE_PEM,f.read())
+#     with open("public.txt",'rb') as f:
+#         client_public_key = crypto.load_publickey(crypto.FILETYPE_PEM,f.read())
             
-    # subject = ca_cert.get_subject()
-    # client_cert = create_cert(ca_cert, subject, ca_key, client_cn, client_email, client_public_key)
-    # with open(client_cn + ".crt", "wt") as f:
-    #     f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, client_cert).decode("utf-8"))
+#     # subject = ca_cert.get_subject()
+#     # client_cert = create_cert(ca_cert, subject, ca_key, client_cn, client_email, client_public_key)
+#     # with open(client_cn + ".crt", "wt") as f:
+#     #     f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, client_cert).decode("utf-8"))
 
-    with open(client_cn + ".crt", "r") as f:
-        cer = crypto.load_certificate(crypto.FILETYPE_PEM, f.read())
-        store = crypto.X509Store()
-        store.add_cert(ca_cert)
-        sub = cer.get_subject()
-        sub.emailAddress = "someotheremail@gmail.com"
-        cer.set_subject(sub)
-        store_ctx = crypto.X509StoreContext(store,cer)
-        store_ctx.verify_certificate()
-        # crypto.verify(cer,cer.)
-        # req = crypto.load_certificate_request(crypto.FILETYPE_PEM, f.read().decode("utf-8"))
-        # print(req.verify(cer.get_pubkey()))
+#     with open(client_cn + ".crt", "r") as f:
+#         cer = crypto.load_certificate(crypto.FILETYPE_PEM, f.read())
+#         store = crypto.X509Store()
+#         store.add_cert(ca_cert)
+#         sub = cer.get_subject()
+#         sub.emailAddress = "someotheremail@gmail.com"
+#         cer.set_subject(sub)
+#         store_ctx = crypto.X509StoreContext(store,cer)
+#         store_ctx.verify_certificate()
+#         # crypto.verify(cer,cer.)
+#         # req = crypto.load_certificate_request(crypto.FILETYPE_PEM, f.read().decode("utf-8"))
+#         # print(req.verify(cer.get_pubkey()))
     
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

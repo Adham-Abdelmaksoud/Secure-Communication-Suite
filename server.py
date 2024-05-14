@@ -1,11 +1,14 @@
 from socket import *
 import os
 import pickle
+import threading
 
+from BlockCipher import BlockCipherEncryption, BlockCipherDecyption
 from KeyManagement import KeyManager
 from PublicKeyCryptosystemRSA import PublicKeyCryptosystemSigning
 from Hashing import Hashing
 from DiffieHelman import DiffieHelman
+
 
 SERVER_IP = ''
 SERVER_PORT = 10000
@@ -22,11 +25,11 @@ def read_cert_bytes(cert_dir='./Server', cert_name = 'certificate.crt'):
 def init_server():
     server_sock = socket(AF_INET, SOCK_STREAM)
     server_sock.bind((SERVER_IP, SERVER_PORT))
-    print('listening to connections...')
     server_sock.listen()
     return server_sock
     
 def start_connection(server_sock):
+    print('listening to connections...')
     client_sock, client_addr = server_sock.accept()
     return client_sock
 
@@ -73,7 +76,30 @@ def recv_dhPubKey(client_sock, dh_server_priv_key, blockcipher_t):
     # calculate Diffie-Helman shared key
     dh = DiffieHelman(dh_server_priv_key, dh_client_pub_key)
     derived_key = dh.calculate_shared_key(blockcipher_t)
-    print(derived_key)
+
+    return derived_key
+
+
+def send_message(client_sock, blockcipher_t, derived_key):    
+    while True:
+        message = input()
+        blockCipherEncrypt = BlockCipherEncryption(blockcipher_t, derived_key)
+        nonce = blockCipherEncrypt.get_nonce()
+        cipher_msg = blockCipherEncrypt.encrypt(message.encode())
+        client_sock.send(pickle.dumps([cipher_msg, nonce]))
+        if message == 'q':
+            break
+
+def recv_message(client_sock, blockcipher_t, derived_key):
+    while True:
+        pickle_obj = client_sock.recv(4096)
+        cipher_msg, nonce = pickle.loads(pickle_obj)
+        blockCipherDecrypt = BlockCipherDecyption(blockcipher_t, derived_key, nonce)
+        message = blockCipherDecrypt.decrypt(cipher_msg).decode()
+        print(message)
+        if message == 'q':
+            break
+        
 
 
 
@@ -85,6 +111,15 @@ if __name__ == '__main__':
 
         blockcipher_t, hashing_t = recv_security_params(client_sock)
         dh_server_priv_key = send_cert_dhPubKey_sign(client_sock, hashing_t)
-        recv_dhPubKey(client_sock, dh_server_priv_key, blockcipher_t)
+        derived_key = recv_dhPubKey(client_sock, dh_server_priv_key, blockcipher_t)
+
+        send_thread = threading.Thread(target=send_message, args=(client_sock, blockcipher_t, derived_key,))
+        recv_thread = threading.Thread(target=recv_message, args=(client_sock, blockcipher_t, derived_key,))
+        
+        send_thread.start()
+        recv_thread.start()
+
+        recv_thread.join()
+        send_thread.join()
 
         close_connection(client_sock)
