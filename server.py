@@ -176,7 +176,7 @@ if __name__ == '__main__':
             print(f'All further communication will be encrypted using {blockcipher_t.value}, and hashed using {hashing_t.value} for checking data integrity')
             print()
         else:
-            print("Hanshake aborted")
+            print("Handshake aborted")
             print("Terminating connection")
             close_connection(client_sock)
             continue
