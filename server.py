@@ -130,7 +130,7 @@ def recv_cert(client_sock, hashing_t):
     if cert_verifier.verify_certificate(client_cert):
         print('Client certificate verified using CA public key')
     else:
-        print('Invalid client certificate')
+        print('Certificate not trusted')
         return False
 
     # verify server signature
@@ -158,6 +158,15 @@ if __name__ == '__main__':
         print()
         dh_server_priv_key = send_cert_dhPubKey_sign(client_sock, hashing_t)
         print()
+        status = client_sock.recv(4096)
+        status = eval(status.decode())
+
+        if not status:
+            print("Handshake aborted")
+            print("Terminating connection")
+            close_connection(client_sock)
+            continue
+
         derived_key = recv_dhPubKey(client_sock, dh_server_priv_key, blockcipher_t)
         print()
 

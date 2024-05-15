@@ -64,12 +64,14 @@ def recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t):
 
     print(f"Derived shared {blockcipher_t.value} key using Diffie Helman key exhange")
 
+    status = True
     # verify server certificate
     cert_verifier = CertificateVerifier()
     if cert_verifier.verify_certificate(server_cert):
         print('Server certificate verified using CA public key')
     else:
-        print('Invalid server certificate')
+        print('Certificate not trusted')
+        status=False
     
     # verify server signature
     sign_verifier = PublicKeyCryptosystemVerification(RSA_server_pub_key)
@@ -78,10 +80,11 @@ def recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t):
         print('Server signature verified using server public key')
     else:
         print('Invalid server signature')
+        status=False
 
     print()
 
-    return dh_client_pub_key, derived_key
+    return dh_client_pub_key, derived_key, status
 
 
 def send_username_password(client_sock, blockcipher_t, hashing_t):
@@ -144,7 +147,10 @@ if __name__ == '__main__':
 
     # Key Exchange
     blockcipher_t, hashing_t = send_security_params(client_sock)
-    dh_client_pub_key, derived_key = recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t)
+    dh_client_pub_key, derived_key, status = recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t)
+    client_sock.send(f"{status}".encode())
+    if not status:
+        sys.exit(0)
     send_dhPubKey(client_sock, dh_client_pub_key)
 
     # Authentication
