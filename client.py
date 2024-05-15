@@ -5,7 +5,7 @@ import sys
 import os
 
 from BlockCipher import BlockCipherType
-from PublicKeyCryptosystemRSA import PublicKeyCryptosystemVerification
+from PublicKeyCryptosystemRSA import PublicKeyCryptosystemVerification, PublicKeyCryptosystemSigning
 from Hashing import Hashing, HashingType
 from KeyManagement import KeyManager
 from DiffieHelman import DiffieHelman
@@ -33,7 +33,6 @@ def send_security_params(client_sock):
         blockcipher_t = BlockCipherType.AES
     elif blockcipher_t == 2:
         blockcipher_t = BlockCipherType.DES
-    print(type(blockcipher_t))
     print('(1) SHA256')
     print('(2) MD5')
     hashing_t = int(input('Enter the number corresponding to the desired hash: '))
@@ -42,7 +41,7 @@ def send_security_params(client_sock):
     elif hashing_t == 2:
         hashing_t = HashingType.MD5
     client_sock.send(pickle.dumps([blockcipher_t, hashing_t]))
-
+    print(f"\nInitiated handshake with paramters: {blockcipher_t.value} block encryption, and {hashing_t.value} hashing algorithm")
     return blockcipher_t, hashing_t
 
 def recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t):
@@ -63,14 +62,24 @@ def recv_cert_dhPubKey_sign(client_sock, blockcipher_t, hashing_t):
     dh = DiffieHelman(dh_client_priv_key, dh_server_pub_key)
     derived_key = dh.calculate_shared_key(blockcipher_t)
 
+    print(f"Derived shared {blockcipher_t.value} key using Diffie Helman key exhange")
+
     # verify server certificate
     cert_verifier = CertificateVerifier()
-    print('Certificate Verified:', cert_verifier.verify_certificate(server_cert))
+    if cert_verifier.verify_certificate(server_cert):
+        print('Server certificate verified using CA public key')
+    else:
+        print('Invalid server certificate')
     
     # verify server signature
     sign_verifier = PublicKeyCryptosystemVerification(RSA_server_pub_key)
     all_bytes = cert_bytes + dh_params_bytes + dh_server_pub_key_bytes
-    print('Signature Verified:', sign_verifier.verify(Hashing.hash(all_bytes, hashing_t), msg_sign))
+    if sign_verifier.verify(Hashing.hash(all_bytes, hashing_t), msg_sign):
+        print('Server signature verified using server public key')
+    else:
+        print('Invalid server signature')
+
+    print()
 
     return dh_client_pub_key, derived_key
 
@@ -79,6 +88,7 @@ def send_username_password(client_sock, blockcipher_t, hashing_t):
     print('(1) Login')
     print('(2) Signup')
     login_signup = int(input('Enter the number corresponding to the desired action: '))
+    print()
     username = input('Enter your username: ')
     password = input('Enter your password: ')
 
@@ -107,16 +117,24 @@ def send_authentication_method(client_sock):
 def read_cert_bytes(cert_dir='./Client', cert_name = 'certificate.crt'):
     with open(os.path.join(cert_dir, cert_name), 'rb') as f:
         return f.read()
+    
+def read_private_key(priv_key_dir='./Client', priv_key_name = 'private.key'):
+    manager = KeyManager()
+    return manager.read_RSA_key(priv_key_name, priv_key_dir)
 
 def send_cert(client_sock, derived_key, blockcipher_t, hashing_t):
     cert_bytes = read_cert_bytes()
+    my_priv_key = read_private_key()
 
     hashed_cert = Hashing.hash(cert_bytes, hashing_t)
-    blockcipherEncrypt = BlockCipherEncryption(blockcipher_t, derived_key)
-    nonce = blockcipherEncrypt.get_nonce()
-    signed_cert = blockcipherEncrypt.encrypt(hashed_cert.digest())
 
-    client_sock.send(pickle.dumps([cert_bytes, signed_cert, nonce]))
+    # form message signature
+    signer = PublicKeyCryptosystemSigning(my_priv_key)
+    msg_sign = signer.sign(hashed_cert)
+
+    print("Sending client certificate")
+
+    client_sock.send(pickle.dumps([cert_bytes, msg_sign]))
 
 
 
@@ -140,15 +158,20 @@ if __name__ == '__main__':
     status = client_sock.recv(4096)
     status = eval(status.decode())
     if status:
-        print('Successful Authentication')
+        print("Authentication successful\n")
+        print('Handshake completed')
+        print(f'All further communication will be encrypted using {blockcipher_t.value}, and hashed using {hashing_t.value} for checking data integrity')
+        print()
     else:
-        print('Unsuccessful Authentication')
+        print("Authentication failed\n")
+        print("Hanshake aborted")
+        print("Terminating connection")
         close_connection(client_sock)
         sys.exit(0)
     
     # Send & Receive Threads
     send_thread = threading.Thread(target=send_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
-    recv_thread = threading.Thread(target=recv_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
+    recv_thread = threading.Thread(target=recv_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,"Server:"))
     send_thread.start()
     recv_thread.start()
 

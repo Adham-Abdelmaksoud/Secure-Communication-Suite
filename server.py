@@ -4,7 +4,7 @@ import pickle
 import threading
 
 from KeyManagement import KeyManager
-from PublicKeyCryptosystemRSA import PublicKeyCryptosystemSigning
+from PublicKeyCryptosystemRSA import PublicKeyCryptosystemSigning, PublicKeyCryptosystemVerification
 from Hashing import Hashing
 from DiffieHelman import DiffieHelman
 from PasswordAuth import PasswordAuth
@@ -42,6 +42,7 @@ def close_connection(client_sock):
 def recv_security_params(client_sock):
     pickle_obj = client_sock.recv(4096)
     blockcipher_t, hashing_t = pickle.loads(pickle_obj)
+    print(f"\nA client initiated a handshake with paramters: {blockcipher_t.value} block encryption, and {hashing_t.value} hashing algorithm")
     return blockcipher_t, hashing_t
 
 def send_cert_dhPubKey_sign(client_sock, hashing_t):
@@ -61,6 +62,8 @@ def send_cert_dhPubKey_sign(client_sock, hashing_t):
     all_bytes = cert_bytes + dh_params_bytes + dh_server_pub_key_bytes
     msg_sign = signer.sign(Hashing.hash(all_bytes, hashing_t))
 
+    print("Sending server certificate, Diffie Hellman key paramters and public key")
+
     # send message
     client_sock.send(pickle.dumps([cert_bytes, dh_params_bytes, dh_server_pub_key_bytes, msg_sign]))
 
@@ -79,18 +82,20 @@ def recv_dhPubKey(client_sock, dh_server_priv_key, blockcipher_t):
     dh = DiffieHelman(dh_server_priv_key, dh_client_pub_key)
     derived_key = dh.calculate_shared_key(blockcipher_t)
 
+    print(f"Derived shared {blockcipher_t.value} key using Diffie Helman key exhange")
+
     return derived_key
 
 
 def recv_username_password(client_sock, blockcipher_t, hashing_t):
+    print("Initiating password based authentication")
+    print("Waiting for login/signup type & username & password")
     pickle_obj = client_sock.recv(4096)
     cipher_msg, msg_signature, nonce = pickle.loads(pickle_obj)
 
     all_data, my_hashed_msg, hashed_msg = decrypt_message(cipher_msg, msg_signature, nonce, derived_key, blockcipher_t, hashing_t)
 
-    if(my_hashed_msg == hashed_msg):
-        print('VALID MESSAGE!')
-    else:
+    if(my_hashed_msg != hashed_msg):
         print('TAMPERED MESSAGE!!!')
 
     username, password, login_signup = pickle.loads(all_data)
@@ -109,25 +114,36 @@ def recv_authentication_method(client_sock):
     return auth_method
 
 
-def recv_cert(client_sock, derived_key, blockcipher_t, hashing_t):
+def recv_cert(client_sock, hashing_t):
+    print("Initiating certificate based authentication")
+    print("Waiting for client certificate")
     pickle_obj = client_sock.recv(4096)
-    client_cert_bytes, signed_cert, nonce = pickle.loads(pickle_obj)
-
-    my_hashed_cert = Hashing.hash(client_cert_bytes, hashing_t).digest()
-
-    blockcipherDecrypt = BlockCipherDecyption(blockcipher_t, derived_key, nonce)
-    hashed_cert = blockcipherDecrypt.decrypt(signed_cert)
-
-    if(my_hashed_cert != hashed_cert):
-        return False
+    client_cert_bytes, msg_sign = pickle.loads(pickle_obj)
 
     manager = KeyManager()
     client_cert = manager.bytes_2_cert(client_cert_bytes)
+    cert_client_pub_key = client_cert.get_pubkey()
+    RSA_client_pub_key = manager.bytes_2_RSAKey(manager.certKey_2_bytes(cert_client_pub_key))
 
+    # verify server certificate
     cert_verifier = CertificateVerifier()
-    status = cert_verifier.verify_certificate(client_cert)
+    if cert_verifier.verify_certificate(client_cert):
+        print('Client certificate verified using CA public key')
+    else:
+        print('Invalid client certificate')
+        return False
 
-    return status
+    # verify server signature
+    sign_verifier = PublicKeyCryptosystemVerification(RSA_client_pub_key)
+    if sign_verifier.verify(Hashing.hash(client_cert_bytes, hashing_t), msg_sign):
+        print('Client signature verified using client public key')
+        print("Authentication successful")
+    else:
+        print('Invalid client signature')
+        print("Authentication failed")
+        return False
+
+    return True
 
 
 
@@ -139,24 +155,35 @@ if __name__ == '__main__':
 
         # Key Exchange
         blockcipher_t, hashing_t = recv_security_params(client_sock)
+        print()
         dh_server_priv_key = send_cert_dhPubKey_sign(client_sock, hashing_t)
+        print()
         derived_key = recv_dhPubKey(client_sock, dh_server_priv_key, blockcipher_t)
+        print()
 
         # Authentication
         auth_method = recv_authentication_method(client_sock)
         if auth_method == 1:
             status = recv_username_password(client_sock, blockcipher_t, hashing_t)
         elif auth_method == 2:
-            status = recv_cert(client_sock, derived_key, blockcipher_t, hashing_t)
+            status = recv_cert(client_sock, hashing_t)
         
         client_sock.send(f'{status}'.encode())
-        if not status:
+        print()
+        
+        if status:
+            print('Handshake completed')
+            print(f'All further communication will be encrypted using {blockcipher_t.value}, and hashed using {hashing_t.value} for checking data integrity')
+            print()
+        else:
+            print("Hanshake aborted")
+            print("Terminating connection")
             close_connection(client_sock)
             continue
 
         # Send & Receive Threads
         send_thread = threading.Thread(target=send_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
-        recv_thread = threading.Thread(target=recv_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,))
+        recv_thread = threading.Thread(target=recv_message_thread, args=(client_sock, derived_key, blockcipher_t, hashing_t,"Client:"))
         
         send_thread.start()
         recv_thread.start()

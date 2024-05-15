@@ -35,7 +35,7 @@ def send_message_thread(client_sock, derived_key, blockcipher_t, hashing_t):
             break
 
 
-def recv_message_thread(client_sock, derived_key, blockcipher_t, hashing_t):
+def recv_message_thread(client_sock, derived_key, blockcipher_t, hashing_t, message_print_prefix):
     while True:
         try:
             pickle_obj = client_sock.recv(4096)
@@ -45,7 +45,7 @@ def recv_message_thread(client_sock, derived_key, blockcipher_t, hashing_t):
             message = message.decode()
 
             if(my_hashed_msg == hashed_msg):
-                print(message)
+                print(message_print_prefix, message)
             else:
                 print('TAMPERED MESSAGE!!!')
             
